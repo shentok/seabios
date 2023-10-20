@@ -252,7 +252,7 @@ static void apple_macio_setup(struct pci_device *pci, void *arg)
 static void piix4_pm_config_setup(u16 bdf)
 {
     // acpi sci is hardwired to 9
-    pci_config_writeb(bdf, PCI_INTERRUPT_LINE, 9);
+    pci_config_writeb(bdf, PCI_INTERRUPT_LINE, PIIX_PM_INTRRUPT);
 
     pci_config_writel(bdf, PIIX_PMBASE, acpi_pm_base | 1);
     pci_config_writeb(bdf, PIIX_PMREGMISC, 0x01); /* enable PM io space */
