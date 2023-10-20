@@ -239,6 +239,15 @@ static void piix_ide_setup(struct pci_device *pci, void *arg)
     pci_config_writew(bdf, 0x42, 0x8000); // enable IDE1
 }
 
+/* VT82xx IDE */
+static void via_ide_setup(struct pci_device *pci, void *arg)
+{
+    u16 bdf = pci->bdf;
+
+    storage_ide_setup(pci, arg);
+    pci_config_writeb(bdf, 0x40, 0x03); // enable IDE0 and IDE1
+}
+
 static void pic_ibm_setup(struct pci_device *pci, void *arg)
 {
     /* PIC, IBM, MPIC & MPIC2 */
@@ -353,6 +362,8 @@ static const struct pci_device_id pci_device_tbl[] = {
                      PCI_CLASS_STORAGE_IDE, piix_ide_setup),
     PCI_DEVICE_CLASS(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82371AB,
                      PCI_CLASS_STORAGE_IDE, piix_ide_setup),
+    PCI_DEVICE_CLASS(PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_82C586_1,
+                     PCI_CLASS_STORAGE_IDE, via_ide_setup),
     PCI_DEVICE_CLASS(PCI_ANY_ID, PCI_ANY_ID, PCI_CLASS_STORAGE_IDE,
                      storage_ide_setup),
 
