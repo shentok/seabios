@@ -9,6 +9,7 @@
 #include "biosvar.h"
 #include "dev-q35.h"
 #include "dev-piix.h"
+#include "dev-via.h"
 #include "hw/pci.h" // pci_config_writel
 #include "hw/pcidevice.h" // pci_find_device
 #include "hw/pci_ids.h" // PCI_VENDOR_ID_INTEL
@@ -212,6 +213,33 @@ static void piix4_apmc_smm_setup(int pmbdf, int i440_bdf)
     pci_config_writeb(i440_bdf, I440FX_SMRAM, 0x02 | 0x08);
 }
 
+// This code is hardcoded for VIA Power Management device.
+static void vt82xx_apmc_smm_setup(int i440_bdf)
+{
+    /* check if SMM init is already done */
+    u16 value = inw(acpi_pm_base + VIA_PMIO_GBLEN);
+    if (value & VIA_PMIO_GBLEN_SW_SMI_EN)
+        return;
+
+    /* enable the SMM memory window */
+    pci_config_writeb(i440_bdf, I440FX_SMRAM, 0x02 | 0x48);
+
+    smm_save_and_copy();
+
+    /* enable SMI generation when writing to the SMI_CMD register */
+    outw(value | VIA_PMIO_GBLEN_SW_SMI_EN, acpi_pm_base + VIA_PMIO_GBLEN);
+
+    /* enable SMI generation */
+    value = inw(acpi_pm_base + VIA_PMIO_GLBCTL);
+    outw((value & ~VIA_PMIO_GBLCTL_SMIIG) | VIA_PMIO_GLBCTL_SMI_EN,
+         acpi_pm_base + VIA_PMIO_GLBCTL);
+
+    smm_relocate_and_restore();
+
+    /* close the SMM memory window and enable normal SMM */
+    pci_config_writeb(i440_bdf, I440FX_SMRAM, 0x02 | 0x08);
+}
+
 /* PCI_VENDOR_ID_INTEL && PCI_DEVICE_ID_INTEL_ICH9_LPC */
 void ich9_lpc_apmc_smm_setup(int pmbdf, int mch_bdf)
 {
@@ -256,6 +284,20 @@ smm_device_setup(void)
         SMMPHBDeviceBDF = phbpci->bdf;
         return;
     }
+    pmpci = pci_find_device(PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_82C686_4);
+    phbpci = pci_find_device(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82441);
+    if (pmpci && phbpci) {
+        SMMPMDeviceBDF = pmpci->bdf;
+        SMMPHBDeviceBDF = phbpci->bdf;
+        return;
+    }
+    pmpci = pci_find_device(PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_8231_4);
+    phbpci = pci_find_device(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82441);
+    if (pmpci && phbpci) {
+        SMMPMDeviceBDF = pmpci->bdf;
+        SMMPHBDeviceBDF = phbpci->bdf;
+        return;
+    }
     pmpci = pci_find_device(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_ICH9_LPC);
     phbpci = pci_find_device(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_Q35_MCH);
     if (pmpci && phbpci) {
@@ -274,6 +316,8 @@ smm_setup(void)
     u16 device = pci_config_readw(SMMPMDeviceBDF, PCI_DEVICE_ID);
     if (device == PCI_DEVICE_ID_INTEL_82371AB_3)
         piix4_apmc_smm_setup(SMMPMDeviceBDF, SMMPHBDeviceBDF);
+    else if (device == PCI_DEVICE_ID_VIA_82C686_4 || device == PCI_DEVICE_ID_VIA_8231_4)
+        vt82xx_apmc_smm_setup(SMMPHBDeviceBDF);
     else
         ich9_lpc_apmc_smm_setup(SMMPMDeviceBDF, SMMPHBDeviceBDF);
 }
