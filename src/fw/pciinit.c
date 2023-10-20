@@ -348,6 +348,21 @@ static void intel_igd_setup(struct pci_device *dev, void *arg)
     }
 }
 
+static void via_ac97_enable(u16 bdf)
+{
+    /* enable AC97 support */
+    pci_config_writeb(bdf, 0x41, 0x80);
+}
+
+static int ViaAc97BDF = -1;
+
+static void via_ac97_setup(struct pci_device *dev, void *arg)
+{
+    ViaAc97BDF = dev->bdf;
+
+    via_ac97_enable(dev->bdf);
+}
+
 static const struct pci_device_id pci_device_tbl[] = {
     /* PIIX3/PIIX4 PCI to ISA bridge */
     PCI_DEVICE(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82371SB_0,
@@ -387,6 +402,10 @@ static const struct pci_device_id pci_device_tbl[] = {
     PCI_DEVICE_CLASS(PCI_VENDOR_ID_INTEL, PCI_ANY_ID, PCI_CLASS_DISPLAY_VGA,
                      intel_igd_setup),
 
+    /* audio */
+    PCI_DEVICE_CLASS(PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_82C686_5,
+                     PCI_CLASS_MULTIMEDIA_AUDIO, via_ac97_setup),
+
     PCI_DEVICE_END,
 };
 
@@ -413,6 +432,10 @@ void pci_resume(void)
 
     if(MCHMmcfgBDF >= 0) {
         mch_mmconfig_setup(MCHMmcfgBDF);
+    }
+
+    if (ViaAc97BDF >= 0) {
+        via_ac97_enable(ViaAc97BDF);
     }
 }
 
