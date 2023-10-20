@@ -9,6 +9,7 @@
 #include "config.h" // CONFIG_*
 #include "dev-q35.h" // Q35_HOST_BRIDGE_PCIEXBAR_ADDR
 #include "dev-piix.h" // PIIX_*
+#include "dev-via.h" // VIA_*
 #include "e820map.h" // e820_add
 #include "hw/ata.h" // PORT_ATA1_CMD_BASE
 #include "hw/pci.h" // pci_config_readl
@@ -284,6 +285,28 @@ static void piix4_pm_setup(struct pci_device *pci, void *arg)
     pmtimer_setup(acpi_pm_base + 0x08);
 }
 
+static void vt82xx_pm_config_setup(u16 bdf)
+{
+    pci_config_writel(bdf, VIA_PMBASE, acpi_pm_base | 1);
+    pci_config_writeb(bdf, VIA_PMREGCFG1, 0x80); /* enable PM io space */
+    pci_config_writeb(bdf, VIA_PMREGINTSEL, PIIX_PM_INTRRUPT);
+    pci_config_writel(bdf, VIA_SMBHSTBASE, (acpi_pm_base + 0x100) | 1);
+    pci_config_writeb(bdf, VIA_SMBHSTCFG, 0x09); /* enable SMBus io space and controller */
+}
+
+static int Vt82xxPmBDF = -1;
+
+/* VIA Power Management device (for ACPI) */
+static void vt82xx_pm_setup(struct pci_device *pci, void *arg)
+{
+    Vt82xxPmBDF = pci->bdf;
+    vt82xx_pm_config_setup(pci->bdf);
+
+    smi_cmd_port = acpi_pm_base + 0x2f;
+    acpi_pm1a_cnt = acpi_pm_base + 0x04;
+    pmtimer_setup(acpi_pm_base + 0x08);
+}
+
 static void ich9_smbus_enable(u16 bdf)
 {
     /* map smbus into io space */
@@ -388,11 +411,15 @@ static const struct pci_device_id pci_device_tbl[] = {
     PCI_DEVICE_CLASS(PCI_VENDOR_ID_IBM, 0xFFFF, PCI_CLASS_SYSTEM_PIC,
                      pic_ibm_setup),
 
-    /* PIIX4 Power Management device (for ACPI) */
+    /* Power Management devices (for ACPI) */
     PCI_DEVICE(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82371AB_3,
                piix4_pm_setup),
     PCI_DEVICE(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_ICH9_SMBUS,
                ich9_smbus_setup),
+    PCI_DEVICE(PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_82C686_4,
+               vt82xx_pm_setup),
+    PCI_DEVICE(PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_8231_4,
+               vt82xx_pm_setup),
 
     /* 0xff00 */
     PCI_DEVICE_CLASS(PCI_VENDOR_ID_APPLE, 0x0017, 0xff00, apple_macio_setup),
@@ -420,6 +447,10 @@ void pci_resume(void)
 
     if (PiixPmBDF >= 0) {
         piix4_pm_config_setup(PiixPmBDF);
+    }
+
+    if (Vt82xxPmBDF >= 0) {
+        vt82xx_pm_config_setup(Vt82xxPmBDF);
     }
 
     if (ICH9LpcBDF >= 0) {
