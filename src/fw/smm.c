@@ -168,12 +168,15 @@ smm_relocate_and_restore(void)
 {
     NeedSMMInit = 1;
 
+    dprintf(3, "raise an SMI interrupt\n");
     /* raise an SMI interrupt */
     outb(0x00, smi_cmd_port);
 
+    dprintf(3, "wait until SMM code executed...");
     /* wait until SMM code executed */
     while (NeedSMMInit != 0)
         ;
+    dprintf(3, " done\n");
 
     /* restore original memory content */
     struct smm_layout *initsmm = (void*)BUILD_SMM_INIT_ADDR;
@@ -216,26 +219,32 @@ static void piix4_apmc_smm_setup(int pmbdf, int i440_bdf)
 // This code is hardcoded for VIA Power Management device.
 static void vt82xx_apmc_smm_setup(int i440_bdf)
 {
+    dprintf(3, "check if SMM init is already done\n");
     /* check if SMM init is already done */
     u16 value = inw(acpi_pm_base + VIA_PMIO_GBLEN);
     if (value & VIA_PMIO_GBLEN_SW_SMI_EN)
         return;
 
+    dprintf(3, "enable the SMM memory window\n");
     /* enable the SMM memory window */
     pci_config_writeb(i440_bdf, I440FX_SMRAM, 0x02 | 0x48);
 
     smm_save_and_copy();
 
+    dprintf(3, "enable SMI generation when writing to the SMI_CMD register\n");
     /* enable SMI generation when writing to the SMI_CMD register */
     outw(value | VIA_PMIO_GBLEN_SW_SMI_EN, acpi_pm_base + VIA_PMIO_GBLEN);
 
+    dprintf(3, "enable SMI generation\n");
     /* enable SMI generation */
     value = inw(acpi_pm_base + VIA_PMIO_GLBCTL);
     outw((value & ~VIA_PMIO_GBLCTL_SMIIG) | VIA_PMIO_GLBCTL_SMI_EN,
          acpi_pm_base + VIA_PMIO_GLBCTL);
 
+    dprintf(3, "relocate and restore\n");
     smm_relocate_and_restore();
 
+    dprintf(3, "close the SMM memory window and enable normal SMM\n");
     /* close the SMM memory window and enable normal SMM */
     pci_config_writeb(i440_bdf, I440FX_SMRAM, 0x02 | 0x08);
 }
