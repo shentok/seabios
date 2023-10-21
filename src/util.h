@@ -150,6 +150,7 @@ void qemu_reboot(void);
 void smbios_legacy_setup(void);
 
 // fw/smm.c
+extern u16 smi_cmd_port;
 void smm_device_setup(void);
 void smm_setup(void);
 

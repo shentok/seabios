@@ -6,6 +6,7 @@
 // This file may be distributed under the terms of the GNU LGPLv3 license.
 
 #include "config.h" // CONFIG_*
+#include "biosvar.h"
 #include "dev-q35.h"
 #include "dev-piix.h"
 #include "hw/pci.h" // pci_config_writel
@@ -13,7 +14,6 @@
 #include "hw/pci_ids.h" // PCI_VENDOR_ID_INTEL
 #include "hw/pci_regs.h" // PCI_DEVICE_ID
 #include "output.h" // dprintf
-#include "paravirt.h" // PORT_SMI_CMD
 #include "stacks.h" // HaveSmmCall32
 #include "string.h" // memcpy
 #include "util.h" // smm_setup
@@ -74,7 +74,7 @@ handle_smi(u16 cs)
 {
     if (!CONFIG_USE_SMM)
         return;
-    u8 cmd = inb(PORT_SMI_CMD);
+    u8 cmd = inb(smi_cmd_port);
     struct smm_layout *smm = MAKE_FLATPTR(cs, 0);
     u32 rev = smm->cpu.i32.smm_rev & SMM_REV_MASK;
     dprintf(DEBUG_HDL_smi, "handle_smi cmd=%x smbase=%p\n", cmd, smm);
@@ -168,7 +168,7 @@ smm_relocate_and_restore(void)
     NeedSMMInit = 1;
 
     /* raise an SMI interrupt */
-    outb(0x00, PORT_SMI_CMD);
+    outb(0x00, smi_cmd_port);
 
     /* wait until SMM code executed */
     while (NeedSMMInit != 0)

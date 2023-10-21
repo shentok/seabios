@@ -152,6 +152,7 @@ call32_smm(void *func, u32 eax)
     dprintf(9, "call32_smm %p %x\n", func, eax);
     call32_prep(C16_SMM);
     u32 bkup_esp;
+    u16 smi = GET_LOW(smi_cmd_port);
     asm volatile(
         // Backup esp / set esp to flat stack location
         "  movl %%esp, %0\n"
@@ -163,7 +164,8 @@ call32_smm(void *func, u32 eax)
         "  movl $" __stringify(CALL32SMM_CMDID) ", %%eax\n"
         "  movl $" __stringify(CALL32SMM_ENTERID) ", %%ecx\n"
         "  movl $(" __stringify(BUILD_BIOS_ADDR) " + 1f), %%ebx\n"
-        "  outb %%al, $" __stringify(PORT_SMI_CMD) "\n"
+        "  movw %3, %%dx\n"
+        "  outb %%al, %%dx\n"
         "  rep; nop\n"
         "  hlt\n"
 
@@ -175,7 +177,8 @@ call32_smm(void *func, u32 eax)
         "  movl $" __stringify(CALL32SMM_CMDID) ", %%eax\n"
         "  movl $" __stringify(CALL32SMM_RETURNID) ", %%ecx\n"
         "  movl $2f, %%ebx\n"
-        "  outb %%al, $" __stringify(PORT_SMI_CMD) "\n"
+        "  movw %3, %%dx\n"
+        "  outb %%al, %%dx\n"
         "  rep; nop\n"
         "  hlt\n"
 
@@ -183,7 +186,7 @@ call32_smm(void *func, u32 eax)
         ASM16_BACK16
         "2:movl %0, %%esp\n"
         : "=&r" (bkup_esp), "+r" (eax)
-        : "r" (func)
+        : "r" (func), "g" (smi)
         : "eax", "ecx", "edx", "ebx", "cc", "memory");
     call32_post();
 
@@ -200,6 +203,7 @@ call16_smm(u32 eax, u32 edx, void *func)
     func -= BUILD_BIOS_ADDR;
     dprintf(9, "call16_smm %p %x %x\n", func, eax, edx);
     u32 stackoffset = Call16Data.ss << 4;
+    u32 smi = smi_cmd_port;
     asm volatile(
         // Restore esp
         "  subl %0, %%esp\n"
@@ -208,7 +212,8 @@ call16_smm(u32 eax, u32 edx, void *func)
         "  movl $" __stringify(CALL32SMM_CMDID) ", %%eax\n"
         "  movl $" __stringify(CALL32SMM_RETURNID) ", %%ecx\n"
         "  movl $(1f - " __stringify(BUILD_BIOS_ADDR) "), %%ebx\n"
-        "  outb %%al, $" __stringify(PORT_SMI_CMD) "\n"
+        "  movl %4, %%edx\n"
+        "  outb %%al, %%dx\n"
         "  rep; nop\n"
         "  hlt\n"
 
@@ -221,7 +226,8 @@ call16_smm(u32 eax, u32 edx, void *func)
         "  movl $" __stringify(CALL32SMM_CMDID) ", %%eax\n"
         "  movl $" __stringify(CALL32SMM_ENTERID) ", %%ecx\n"
         "  movl $2f, %%ebx\n"
-        "  outb %%al, $" __stringify(PORT_SMI_CMD) "\n"
+        "  movl %4, %%edx\n"
+        "  outb %%al, %%dx\n"
         "  rep; nop\n"
         "  hlt\n"
 
@@ -229,7 +235,7 @@ call16_smm(u32 eax, u32 edx, void *func)
         ASM32_BACK32
         "2:addl %0, %%esp\n"
         : "+r" (stackoffset), "+r" (eax), "+d" (edx)
-        : "r" (func)
+        : "r" (func), "g" (smi)
         : "eax", "ecx", "ebx", "cc", "memory");
     return eax;
 }

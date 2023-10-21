@@ -57,6 +57,8 @@ static u64 pci_io_low_end = 0xa000;
 static u64 pci_mem64_top  = 0;
 static u32 pci_pad_mem64  = 0;
 
+u16 smi_cmd_port VARLOW = 0;
+
 struct pci_region_entry {
     struct pci_device *dev;
     int bar;
@@ -268,6 +270,7 @@ static void piix4_pm_setup(struct pci_device *pci, void *arg)
     PiixPmBDF = pci->bdf;
     piix4_pm_config_setup(pci->bdf);
 
+    smi_cmd_port = 0xb2;
     acpi_pm1a_cnt = acpi_pm_base + 0x04;
     pmtimer_setup(acpi_pm_base + 0x08);
 }
@@ -291,6 +294,8 @@ static void ich9_smbus_setup(struct pci_device *dev, void *arg)
     ICH9SmbusBDF = dev->bdf;
 
     ich9_smbus_enable(dev->bdf);
+
+    smi_cmd_port = 0xb2;
 }
 
 static void intel_igd_setup(struct pci_device *dev, void *arg)

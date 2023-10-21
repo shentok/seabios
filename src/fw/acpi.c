@@ -46,7 +46,7 @@ static void piix4_fadt_setup(struct pci_device *pci, void *arg)
     fadt->model = 1;
     fadt->reserved1 = 0;
     fadt->sci_int = cpu_to_le16(PIIX_PM_INTRRUPT);
-    fadt->smi_cmd = cpu_to_le32(PORT_SMI_CMD);
+    fadt->smi_cmd = cpu_to_le32(smi_cmd_port);
     fadt->acpi_enable = PIIX_ACPI_ENABLE;
     fadt->acpi_disable = PIIX_ACPI_DISABLE;
     fadt->pm1a_evt_blk = cpu_to_le32(acpi_pm_base);
@@ -74,7 +74,7 @@ static void ich9_lpc_fadt_setup(struct pci_device *dev, void *arg)
     fadt->model = 1;
     fadt->reserved1 = 0;
     fadt->sci_int = cpu_to_le16(9);
-    fadt->smi_cmd = cpu_to_le32(PORT_SMI_CMD);
+    fadt->smi_cmd = cpu_to_le32(smi_cmd_port);
     fadt->acpi_enable = ICH9_ACPI_ENABLE;
     fadt->acpi_disable = ICH9_ACPI_DISABLE;
     fadt->pm1a_evt_blk = cpu_to_le32(acpi_pm_base);
