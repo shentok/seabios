@@ -47,7 +47,6 @@ static inline int runningOnKVM(void) {
 
 // Common paravirt ports.
 #define PORT_SMI_CMD                0x00b2
-#define PORT_SMI_STATUS             0x00b3
 #define PORT_QEMU_CFG_CTL           0x0510
 #define PORT_QEMU_CFG_DATA          0x0511
 #define PORT_QEMU_CFG_DMA_ADDR_HIGH 0x0514

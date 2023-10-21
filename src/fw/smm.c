@@ -13,7 +13,7 @@
 #include "hw/pci_ids.h" // PCI_VENDOR_ID_INTEL
 #include "hw/pci_regs.h" // PCI_DEVICE_ID
 #include "output.h" // dprintf
-#include "paravirt.h" // PORT_SMI_STATUS
+#include "paravirt.h" // PORT_SMI_CMD
 #include "stacks.h" // HaveSmmCall32
 #include "string.h" // memcpy
 #include "util.h" // smm_setup
@@ -27,6 +27,8 @@
 
 #define SMM_REV_I32  0x00020000
 #define SMM_REV_I64  0x00020064
+
+static volatile u8 NeedSMMInit = 0;
 
 struct smm_state {
     union {
@@ -88,7 +90,7 @@ handle_smi(u16 cs)
             return;
         }
         // indicate to smm_relocate_and_restore() that the SMM code was executed
-        outb(0x00, PORT_SMI_STATUS);
+        NeedSMMInit = 0;
 
         if (CONFIG_CALL32_SMM) {
             // Backup current cpu state for SMM trampolining
@@ -163,14 +165,13 @@ smm_save_and_copy(void)
 static void
 smm_relocate_and_restore(void)
 {
-    /* init APM status port */
-    outb(0x01, PORT_SMI_STATUS);
+    NeedSMMInit = 1;
 
     /* raise an SMI interrupt */
     outb(0x00, PORT_SMI_CMD);
 
     /* wait until SMM code executed */
-    while (inb(PORT_SMI_STATUS) != 0x00)
+    while (NeedSMMInit != 0)
         ;
 
     /* restore original memory content */
