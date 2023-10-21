@@ -187,10 +187,10 @@ smm_relocate_and_restore(void)
 }
 
 // This code is hardcoded for PIIX4 Power Management device.
-static void piix4_apmc_smm_setup(int isabdf, int i440_bdf)
+static void piix4_apmc_smm_setup(int pmbdf, int i440_bdf)
 {
     /* check if SMM init is already done */
-    u32 value = pci_config_readl(isabdf, PIIX_DEVACTB);
+    u32 value = pci_config_readl(pmbdf, PIIX_DEVACTB);
     if (value & PIIX_DEVACTB_APMC_EN)
         return;
 
@@ -200,7 +200,7 @@ static void piix4_apmc_smm_setup(int isabdf, int i440_bdf)
     smm_save_and_copy();
 
     /* enable SMI generation when writing to the APMC register */
-    pci_config_writel(isabdf, PIIX_DEVACTB, value | PIIX_DEVACTB_APMC_EN);
+    pci_config_writel(pmbdf, PIIX_DEVACTB, value | PIIX_DEVACTB_APMC_EN);
 
     /* enable SMI generation */
     value = inl(acpi_pm_base + PIIX_PMIO_GLBCTL);
@@ -213,7 +213,7 @@ static void piix4_apmc_smm_setup(int isabdf, int i440_bdf)
 }
 
 /* PCI_VENDOR_ID_INTEL && PCI_DEVICE_ID_INTEL_ICH9_LPC */
-void ich9_lpc_apmc_smm_setup(int isabdf, int mch_bdf)
+void ich9_lpc_apmc_smm_setup(int pmbdf, int mch_bdf)
 {
     /* check if SMM init is already done */
     u32 value = inl(acpi_pm_base + ICH9_PMIO_SMI_EN);
@@ -230,8 +230,8 @@ void ich9_lpc_apmc_smm_setup(int isabdf, int mch_bdf)
          acpi_pm_base + ICH9_PMIO_SMI_EN);
 
     /* lock SMI generation */
-    value = pci_config_readw(isabdf, ICH9_LPC_GEN_PMCON_1);
-    pci_config_writel(isabdf, ICH9_LPC_GEN_PMCON_1,
+    value = pci_config_readw(pmbdf, ICH9_LPC_GEN_PMCON_1);
+    pci_config_writel(pmbdf, ICH9_LPC_GEN_PMCON_1,
                       value | ICH9_LPC_GEN_PMCON_1_SMI_LOCK);
 
     smm_relocate_and_restore();
@@ -240,7 +240,7 @@ void ich9_lpc_apmc_smm_setup(int isabdf, int mch_bdf)
     pci_config_writeb(mch_bdf, Q35_HOST_BRIDGE_SMRAM, 0x02 | 0x08);
 }
 
-static int SMMISADeviceBDF = -1, SMMPMDeviceBDF = -1;
+static int SMMPMDeviceBDF = -1, SMMPHBDeviceBDF = -1;
 
 void
 smm_device_setup(void)
@@ -248,32 +248,32 @@ smm_device_setup(void)
     if (!CONFIG_USE_SMM)
         return;
 
-    struct pci_device *isapci, *pmpci;
-    isapci = pci_find_device(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82371AB_3);
-    pmpci = pci_find_device(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82441);
-    if (isapci && pmpci) {
-        SMMISADeviceBDF = isapci->bdf;
+    struct pci_device *pmpci, *phbpci;
+    pmpci = pci_find_device(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82371AB_3);
+    phbpci = pci_find_device(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82441);
+    if (pmpci && phbpci) {
         SMMPMDeviceBDF = pmpci->bdf;
+        SMMPHBDeviceBDF = phbpci->bdf;
         return;
     }
-    isapci = pci_find_device(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_ICH9_LPC);
-    pmpci = pci_find_device(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_Q35_MCH);
-    if (isapci && pmpci) {
-        SMMISADeviceBDF = isapci->bdf;
+    pmpci = pci_find_device(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_ICH9_LPC);
+    phbpci = pci_find_device(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_Q35_MCH);
+    if (pmpci && phbpci) {
         SMMPMDeviceBDF = pmpci->bdf;
+        SMMPHBDeviceBDF = phbpci->bdf;
     }
 }
 
 void
 smm_setup(void)
 {
-    if (!CONFIG_USE_SMM || SMMISADeviceBDF < 0)
+    if (!CONFIG_USE_SMM || SMMPMDeviceBDF < 0)
         return;
 
     dprintf(3, "init smm\n");
-    u16 device = pci_config_readw(SMMISADeviceBDF, PCI_DEVICE_ID);
+    u16 device = pci_config_readw(SMMPMDeviceBDF, PCI_DEVICE_ID);
     if (device == PCI_DEVICE_ID_INTEL_82371AB_3)
-        piix4_apmc_smm_setup(SMMISADeviceBDF, SMMPMDeviceBDF);
+        piix4_apmc_smm_setup(SMMPMDeviceBDF, SMMPHBDeviceBDF);
     else
-        ich9_lpc_apmc_smm_setup(SMMISADeviceBDF, SMMPMDeviceBDF);
+        ich9_lpc_apmc_smm_setup(SMMPMDeviceBDF, SMMPHBDeviceBDF);
 }
