@@ -10,9 +10,11 @@
 
 #include "byteorder.h" // be32_to_cpu
 #include "config.h" // CONFIG_QEMU
+#include "dev-q35.h" // PCI_DEVICE_ID_INTEL_Q35_MCH
 #include "e820map.h" // e820_add
 #include "hw/pci.h" // pci_config_readw
 #include "hw/pcidevice.h" // pci_probe_devices
+#include "hw/pci_ids.h" // PCI_DEVICE_ID_INTEL_82441
 #include "hw/pci_regs.h" // PCI_DEVICE_ID
 #include "hw/serialio.h" // PORT_SERIAL1
 #include "hw/rtc.h" // CMOS_*
@@ -208,10 +210,10 @@ static void qemu_detect(void)
 
     PlatformRunningOn |= PF_QEMU;
     switch (d) {
-    case 0x1237:
+    case PCI_DEVICE_ID_INTEL_82441:
         dprintf(1, "Running on QEMU (i440fx)\n");
         break;
-    case 0x29c0:
+    case PCI_DEVICE_ID_INTEL_Q35_MCH:
         dprintf(1, "Running on QEMU (q35)\n");
         break;
     default:
