@@ -8,6 +8,7 @@
 #include "config.h" // CONFIG_*
 #include "dev-q35.h" // PCI_VENDOR_ID_INTEL
 #include "dev-piix.h" // I440FX_PAM0
+#include "dev-via.h" // VT8363A_PAM
 #include "hw/pci.h" // pci_config_writeb
 #include "hw/pci_ids.h" // PCI_VENDOR_ID_INTEL
 #include "hw/pci_regs.h" // PCI_VENDOR_ID
@@ -57,6 +58,27 @@ __make_bios_writable_intel(u16 bdf, u32 pam0)
 }
 
 static void
+__make_bios_writable_via(u16 bdf)
+{
+    int i;
+
+    const u8 reg = pci_ioconfig_readb(bdf, VT8363A_PAM + 2);
+
+    // Make ram from 0xc0000-0xe0000 writable
+    for (i=0; i<2; i++) {
+        pci_ioconfig_writeb(bdf, VT8363A_PAM + i, 0xff);
+    }
+    // Make ram from 0xe0000-0x100000 writable
+    pci_config_writeb(bdf, VT8363A_PAM + 2, 0xf0 | (reg & 0x0f));
+
+    if (!(reg & 0x20))
+        // Copy bios.
+        memcpy(VSYMBOL(code32flat_start)
+               , VSYMBOL(code32flat_start) + BIOS_SRC_OFFSET
+               , SYMBOL(code32flat_end) - SYMBOL(code32flat_start));
+}
+
+static void
 make_bios_writable_intel(u16 bdf, u32 pam0)
 {
     int reg = pci_ioconfig_readb(bdf, pam0);
@@ -72,6 +94,24 @@ make_bios_writable_intel(u16 bdf, u32 pam0)
     }
     // Ram already present - just enable writes
     __make_bios_writable_intel(bdf, pam0);
+}
+
+static void
+make_bios_writable_via(u16 bdf)
+{
+    int reg = pci_ioconfig_readb(bdf, VT8363A_PAM + 2);
+    if (!(reg & 0x20)) {
+        // QEMU doesn't fully implement the via shadow capabilities -
+        // if ram isn't backing the bios segment when shadowing is
+        // disabled, the code itself won't be in memory.  So, run the
+        // code from the high-memory flash location.
+        u32 pos = (u32)__make_bios_writable_via + BIOS_SRC_OFFSET;
+        void (*func)(u16 bdf) = (void*)pos;
+        func(bdf);
+        return;
+    }
+    // Ram already present - just enable writes
+    __make_bios_writable_via(bdf);
 }
 
 static void
@@ -111,6 +151,23 @@ make_bios_readonly_intel(u16 bdf, u32 pam0)
     pci_config_writel(bdf, ALIGN_DOWN(pam0, 4) + 4, pamdata.data32[1]);
 }
 
+static void
+make_bios_readonly_via(u16 bdf)
+{
+    // Flush any pending writes before locking memory.
+    wbinvd();
+
+    int i;
+    u8 reg;
+    // Write-protect ram from 0xc0000-0xe0000
+    for (i=0; i<2; i++) {
+        pci_ioconfig_writeb(bdf, VT8363A_PAM + i, 0xaa);
+    }
+    // Write-protect ram from 0xf0000-0x100000, leave 0xe0000-0xf00000 open
+    reg = pci_ioconfig_readb(bdf, VT8363A_PAM + 2);
+    pci_ioconfig_writeb(bdf, VT8363A_PAM + 2, 0xe0 | (reg & 0x0f));
+}
+
 static int ShadowBDF = -1;
 
 // Make the 0xc0000-0x100000 area read/writable.
@@ -142,6 +199,13 @@ make_bios_writable(void)
             ShadowBDF = bdf;
             return;
         }
+        if (vendor == PCI_VENDOR_ID_VIA
+            && device == PCI_DEVICE_ID_VIA_82C691_0) {
+            make_bios_writable_via(bdf);
+            code_mutable_preinit();
+            ShadowBDF = bdf;
+            return;
+        }
     }
     dprintf(1, "Unable to unlock ram - bridge not found\n");
 }
@@ -162,6 +226,8 @@ make_bios_readonly(void)
     u16 device = pci_config_readw(ShadowBDF, PCI_DEVICE_ID);
     if (device == PCI_DEVICE_ID_INTEL_82441)
         make_bios_readonly_intel(ShadowBDF, I440FX_PAM0);
+    else if (device == PCI_DEVICE_ID_VIA_82C691_0)
+        make_bios_readonly_via(ShadowBDF);
     else
         make_bios_readonly_intel(ShadowBDF, Q35_HOST_BRIDGE_PAM0);
 }
