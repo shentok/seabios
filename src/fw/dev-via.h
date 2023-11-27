@@ -13,4 +13,6 @@
 #define VIA_PMIO_GLBCTL_SMI_EN   1
 #define VIA_PMIO_GBLCTL_SMIIG    (1 << 4)
 
+#define VT8363A_PAM      0x61
+
 #endif // dev-via.h
