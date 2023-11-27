@@ -217,8 +217,11 @@ static void piix4_apmc_smm_setup(int pmbdf, int i440_bdf)
 }
 
 // This code is hardcoded for VIA Power Management device.
-static void vt82xx_apmc_smm_setup(int i440_bdf)
+static void vt82xx_apmc_smm_setup(int phb_bdf)
 {
+    const u16 vendor_id = pci_config_readw(phb_bdf, PCI_VENDOR_ID);
+    const u8 is_intel = vendor_id == PCI_VENDOR_ID_INTEL;
+
     dprintf(3, "check if SMM init is already done\n");
     /* check if SMM init is already done */
     u16 value = inw(acpi_pm_base + VIA_PMIO_GBLEN);
@@ -227,7 +230,12 @@ static void vt82xx_apmc_smm_setup(int i440_bdf)
 
     dprintf(3, "enable the SMM memory window\n");
     /* enable the SMM memory window */
-    pci_config_writeb(i440_bdf, I440FX_SMRAM, 0x02 | 0x48);
+    if (is_intel)
+        pci_config_writeb(phb_bdf, I440FX_SMRAM, 0x02 | 0x48);
+    else {
+        u8 reg = pci_config_readb(phb_bdf, VT8363A_SMRAM);
+        pci_config_writeb(phb_bdf, VT8363A_SMRAM, (reg & 0xfc) | 0x01);
+    }
 
     smm_save_and_copy();
 
@@ -246,7 +254,12 @@ static void vt82xx_apmc_smm_setup(int i440_bdf)
 
     dprintf(3, "close the SMM memory window and enable normal SMM\n");
     /* close the SMM memory window and enable normal SMM */
-    pci_config_writeb(i440_bdf, I440FX_SMRAM, 0x02 | 0x08);
+    if (is_intel)
+        pci_config_writeb(phb_bdf, I440FX_SMRAM, 0x02 | 0x08);
+    else {
+        u8 reg = pci_config_readb(phb_bdf, VT8363A_SMRAM);
+        pci_config_writeb(phb_bdf, VT8363A_SMRAM, (reg & 0xfc) | 0x00);
+    }
 }
 
 /* PCI_VENDOR_ID_INTEL && PCI_DEVICE_ID_INTEL_ICH9_LPC */
@@ -295,6 +308,8 @@ smm_device_setup(void)
     }
     pmpci = pci_find_device(PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_82C686_4);
     phbpci = pci_find_device(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82441);
+    if (!phbpci)
+        phbpci = pci_find_device(PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_82C691_0);
     if (pmpci && phbpci) {
         SMMPMDeviceBDF = pmpci->bdf;
         SMMPHBDeviceBDF = phbpci->bdf;
@@ -302,6 +317,8 @@ smm_device_setup(void)
     }
     pmpci = pci_find_device(PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_8231_4);
     phbpci = pci_find_device(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82441);
+    if (!phbpci)
+        phbpci = pci_find_device(PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_82C691_0);
     if (pmpci && phbpci) {
         SMMPMDeviceBDF = pmpci->bdf;
         SMMPHBDeviceBDF = phbpci->bdf;
