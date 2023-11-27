@@ -585,6 +585,8 @@ static const struct pci_device_id pci_platform_tbl[] = {
                i440fx_mem_addr_setup),
     PCI_DEVICE(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_Q35_MCH,
                mch_mem_addr_setup),
+    PCI_DEVICE(PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_82C691_0,
+               i440fx_mem_addr_setup),
     PCI_DEVICE_END
 };
 
