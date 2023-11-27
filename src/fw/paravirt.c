@@ -216,6 +216,9 @@ static void qemu_detect(void)
     case PCI_DEVICE_ID_INTEL_Q35_MCH:
         dprintf(1, "Running on QEMU (q35)\n");
         break;
+    case PCI_DEVICE_ID_VIA_82C691_0:
+        dprintf(1, "Running on QEMU (vt82c694t)\n");
+        break;
     default:
         dprintf(1, "Running on QEMU (unknown nb: %04x:%04x)\n", v, d);
         break;
