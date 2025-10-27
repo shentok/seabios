@@ -645,11 +645,19 @@ yield(void)
 void VISIBLE16
 wait_irq(void)
 {
+    u16 cs, ip;
     if (need_hop_back()) {
+        dprintf(1, "stack hop back\n");
         stack_hop_back(wait_irq, 0, 0);
         return;
     }
-    asm volatile("sti ; hlt ; cli ; cld": : :"memory");
+    asm volatile("call 1f\n"
+                 "1: pop %0\n"
+                 "mov %%cs, %1"
+                 : "=r"(ip), "=r"(cs));
+    dprintf(1, "Current location: %04x:%04x\n", cs, ip);
+    asm volatile("sti ; cli ; cld": : :"memory");
+    dprintf(1, "After hlt\n");
 }
 
 // Wait for next irq to occur.
